@@ -10,7 +10,7 @@
         <module name="eureka-server" />
         <module name="booking-service" />
       </profile>
-      <profile name="Annotation profile for spot-service" enabled="true">
+      <profile name="Annotation profile for vehicle-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -19,6 +19,7 @@
         </processorPath>
         <module name="auth-service" />
         <module name="payment-service" />
+        <module name="vehicle-service" />
         <module name="spot-service" />
         <module name="notification-service" />
         <module name="parkinglot-service" />
@@ -35,6 +36,7 @@
       <module name="parkinglot-service" options="-parameters" />
       <module name="payment-service" options="-parameters" />
       <module name="spot-service" options="-parameters" />
+      <module name="vehicle-service" options="-parameters" />
     </option>
   </component>
 </project>

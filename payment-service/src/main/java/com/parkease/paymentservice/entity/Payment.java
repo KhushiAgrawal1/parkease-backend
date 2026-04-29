@@ -1,9 +1,6 @@
 package com.parkease.paymentservice.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
@@ -15,6 +12,10 @@ public class Payment {
     private Long id;
 
     private Long bookingId;
+    private Long userId; // 🔥 NEW (IMPORTANT)
+
     private Double amount;
-    private String status; // SUCCESS / FAILED
+
+    private boolean success = true;
+    private boolean refunded = false; // 🔥 already added
 }

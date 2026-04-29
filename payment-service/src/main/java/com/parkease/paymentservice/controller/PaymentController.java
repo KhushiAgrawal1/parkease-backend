@@ -15,17 +15,23 @@ public class PaymentController {
     private PaymentService service;
 
     @PostMapping
-    public Payment pay(@RequestBody Payment payment) {
-        return service.processPayment(payment);
-    }
-
-    @GetMapping
-    public List<Payment> getAll() {
-        return service.getAll();
+    public Payment makePayment(@RequestBody Payment payment) {
+        return service.makePayment(payment);
     }
 
     @GetMapping("/booking/{bookingId}")
     public Payment getByBooking(@PathVariable Long bookingId) {
         return service.getByBookingId(bookingId);
+    }
+
+    @PutMapping("/refund/{bookingId}")
+    public Payment refund(@PathVariable Long bookingId) {
+        return service.refundPayment(bookingId);
+    }
+
+    // 🔥 NEW: USER PAYMENT HISTORY
+    @GetMapping("/user/{userId}")
+    public List<Payment> getUserPayments(@PathVariable Long userId) {
+        return service.getByUser(userId);
     }
 }

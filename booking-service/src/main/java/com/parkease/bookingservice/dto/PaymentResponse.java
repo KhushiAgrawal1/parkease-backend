@@ -1,11 +1,14 @@
 package com.parkease.bookingservice.dto;
 
 import lombok.Data;
+
 @Data
-public class Payment {
+public class PaymentResponse {
+
+    private Long id;
     private Long bookingId;
+    private Long userId;
     private Double amount;
     private boolean success;
-    private Long userId;   // 🔥 ADD THIS
-
+    private boolean refunded;
 }

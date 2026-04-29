@@ -13,7 +13,6 @@ public interface SpotClient {
     @PutMapping("/spots/occupy/{id}")
     void occupySpot(@PathVariable("id") Long id);
 
-    // 🔥 ADD THIS
     @PutMapping("/spots/free/{id}")
     void freeSpot(@PathVariable("id") Long id);
 }

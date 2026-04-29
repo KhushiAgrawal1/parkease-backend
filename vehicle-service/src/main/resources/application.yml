@@ -1,0 +1,21 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: vehicle-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/parkease_vehicle
+    username: root
+    password: 8770B26@k
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

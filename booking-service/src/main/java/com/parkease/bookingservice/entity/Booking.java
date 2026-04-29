@@ -1,11 +1,8 @@
 package com.parkease.bookingservice.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import org.antlr.v4.runtime.misc.NotNull;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,14 +13,28 @@ public class Booking {
     @GeneratedValue
     private Long id;
 
-    @NotNull
+    public enum BookingStatus {
+        RESERVED,
+        ACTIVE,
+        COMPLETED,
+        CANCELLED,
+        FAILED
+    }
+
+    @Enumerated(EnumType.STRING)
+    private BookingStatus status;
+
     private Long userId;
-    @NotNull
     private Long lotId;
-    @NotNull
     private Long spotId;
 
-    private String status; // BOOKED / COMPLETED
+    @NotNull
+    private Long vehicleId;
+
+    private LocalDateTime startTime;
+    private LocalDateTime endTime;
 
     private LocalDateTime createdAt;
+
+    private boolean expired;
 }

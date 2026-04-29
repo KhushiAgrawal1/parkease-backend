@@ -1,26 +1,24 @@
 package com.parkease.bookingservice.service;
-
+import com.parkease.bookingservice.dto.RecentBookingDTO;
 import com.parkease.bookingservice.client.NotificationClient;
 import com.parkease.bookingservice.client.PaymentClient;
 import com.parkease.bookingservice.client.SpotClient;
-import com.parkease.bookingservice.dto.ParkingSpot;
-import com.parkease.bookingservice.dto.Payment;
+import com.parkease.bookingservice.client.VehicleClient;
+import com.parkease.bookingservice.dto.*;
 import com.parkease.bookingservice.entity.Booking;
 import com.parkease.bookingservice.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.parkease.bookingservice.dto.PaymentResponse;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class BookingService {
-
-    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     @Autowired
     private BookingRepository repo;
@@ -32,99 +30,156 @@ public class BookingService {
     private PaymentClient paymentClient;
 
     @Autowired
+    private VehicleClient vehicleClient;
+
+    @Autowired
     private NotificationClient notificationClient;
 
-    // 🔹 GET ALL BOOKINGS
     public List<Booking> getAll() {
-        log.info("Fetching all bookings");
         return repo.findAll();
     }
 
+    public Map<String, Long> getStatusCount() {
+
+        List<Booking> bookings = repo.findAll();
+
+        Map<String, Long> result = new HashMap<>();
+
+        for (Booking.BookingStatus status : Booking.BookingStatus.values()) {
+
+            long count = bookings.stream()
+                    .filter(b -> b.getStatus() == status)
+                    .count();
+
+            result.put(status.name(), count);
+        }
+
+        return result;
+    }
+
+    // 🔥 CREATE BOOKING
     public Booking create(Booking booking) {
 
-        log.info("Booking request received: {}", booking);
+        // 1. Validate vehicle
+        if (booking.getVehicleId() == null) {
+            throw new RuntimeException("Vehicle is required for booking");
+        }
 
-        // 🔥 STEP 1: Get Spot Details
+        try {
+            vehicleClient.getVehicle(booking.getVehicleId());
+        } catch (Exception e) {
+            throw new RuntimeException("Vehicle not found");
+        }
+
+        // 2. Check spot
         ParkingSpot spot = spotClient.getSpot(booking.getSpotId());
 
         if ("OCCUPIED".equalsIgnoreCase(spot.getStatus())) {
-            log.error("Spot {} is already occupied", booking.getSpotId());
             throw new RuntimeException("Spot already occupied");
         }
 
-        // 🔥 STEP 2: Save booking as PENDING
-        booking.setStatus("PENDING");
-        booking.setCreatedAt(LocalDateTime.now());
-        Booking saved = repo.save(booking);
-        log.info("Booking saved with ID {}", saved.getId());
+        // 3. Prevent double booking
+        List<Booking> existingBookings =
+                repo.findBySpotIdAndStatusIn(
+                        booking.getSpotId(),
+                        List.of(
+                                Booking.BookingStatus.RESERVED,
+                                Booking.BookingStatus.ACTIVE
+                        )
+                );
 
-        try {
-            // 🔥 STEP 3: Call Payment Service
-            Payment payment = new Payment();
-            payment.setBookingId(saved.getId());
-            payment.setAmount(100.0);
-
-            Payment response = paymentClient.makePayment(payment);
-
-            if (!"SUCCESS".equalsIgnoreCase(response.getStatus())) {
-                throw new RuntimeException("Payment failed");
-            }
-
-            log.info("Payment successful for booking {}", saved.getId());
-
-            // 🔥 STEP 4: Occupy Spot
-            spotClient.occupySpot(saved.getSpotId());
-            log.info("Spot {} marked as OCCUPIED", saved.getSpotId());
-
-            // 🔥 STEP 5: Update booking status
-            saved.setStatus("BOOKED");
-            Booking finalBooking = repo.save(saved);
-
-            // 🔥 STEP 6: Send Notification
-            notificationClient.sendNotification(
-                    Map.of(
-                            "email", "agrawalkhushi267@gmail.com",   // 🔥 replace with your real email
-                            "message", "Booking Confirmed for Spot " + booking.getSpotId()
-                    )
-            );
-
-            log.info("Booking {} confirmed", finalBooking.getId());
-
-            return finalBooking;
-
-        } catch (Exception e) {
-
-            // 🔥 IMPORTANT FIX: rollback booking if anything fails
-            log.error("Error occurred, cancelling booking {}", saved.getId());
-
-            saved.setStatus("FAILED");
-            repo.save(saved);
-
-            throw new RuntimeException("Booking failed: " + e.getMessage());
+        if (!existingBookings.isEmpty()) {
+            throw new RuntimeException("Spot already booked");
         }
+
+        // 4. Set booking data
+        booking.setStatus(Booking.BookingStatus.RESERVED);
+        booking.setCreatedAt(LocalDateTime.now());
+        booking.setStartTime(LocalDateTime.now());
+        booking.setEndTime(LocalDateTime.now().plusHours(1));
+
+        Booking saved = repo.save(booking);
+
+        // 🔥 5. PAYMENT
+        Payment payment = new Payment();
+        payment.setBookingId(saved.getId());
+        payment.setUserId(saved.getUserId()); // ✅ IMPORTANT
+        payment.setAmount(calculateAmount(saved));
+
+        Payment response = paymentClient.makePayment(payment);
+
+        if (response == null || !response.isSuccess()) {
+            saved.setStatus(Booking.BookingStatus.FAILED);
+            repo.save(saved);
+            throw new RuntimeException("Payment failed");
+        }
+
+        // 6. Occupy spot
+        spotClient.occupySpot(saved.getSpotId());
+
+        // 7. Notification
+        notificationClient.sendNotification(
+                Map.of(
+                        "email", "agrawalkhushi267@gmail.com",
+                        "message", "Booking Confirmed for Spot " + booking.getSpotId()
+                )
+        );
+
+        return repo.save(saved);
     }
 
-    // 🔹 CANCEL BOOKING
-    public Booking cancel(Long id) {
+    // 🔥 CHECK-IN
+    public Booking checkIn(Long id) {
+        Booking booking = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        log.info("Cancel request received for bookingId: {}", id);
+        booking.setStatus(Booking.BookingStatus.ACTIVE);
+
+        return repo.save(booking);
+    }
+
+    // 🔥 CHECK-OUT
+    public Booking checkOut(Long id) {
 
         Booking booking = repo.findById(id)
-                .orElseThrow(() -> {
-                    log.error("Booking not found with id: {}", id);
-                    return new RuntimeException("Booking not found");
-                });
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        // 🔥 FREE THE SPOT
-        log.info("Freeing spot {}", booking.getSpotId());
+        booking.setStatus(Booking.BookingStatus.COMPLETED);
+
+        // free spot
         spotClient.freeSpot(booking.getSpotId());
 
-        booking.setStatus("CANCELLED");
-        Booking updated = repo.save(booking);
+        double amount = calculateAmount(booking);
 
-        log.info("Booking {} cancelled and spot freed", id);
+        // 🔥 PAYMENT (final charge)
+        Payment payment = new Payment();
+        payment.setBookingId(id);
+        payment.setUserId(booking.getUserId()); // ✅ IMPORTANT
+        payment.setAmount(amount);
 
-        return updated;
+        paymentClient.makePayment(payment);
+
+        return repo.save(booking);
+    }
+
+    // 🔥 CANCEL BOOKING
+    public Booking cancel(Long id) {
+
+        Booking booking = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        booking.setStatus(Booking.BookingStatus.CANCELLED);
+
+        spotClient.freeSpot(booking.getSpotId());
+
+        // 🔥 REFUND
+        try {
+            paymentClient.refundPayment(booking.getId());
+        } catch (Exception e) {
+            System.out.println("Refund failed: " + e.getMessage());
+        }
+
+        return repo.save(booking);
     }
 
     public List<Booking> getByUser(Long userId) {
@@ -136,7 +191,109 @@ public class BookingService {
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
     }
 
-    public List<Booking> getByStatus(String status) {
+    public List<Booking> getByStatus(Booking.BookingStatus status) {
         return repo.findByStatus(status);
+    }
+
+    // 🔥 PRICE LOGIC
+    public double calculateAmount(Booking booking) {
+
+        if (booking.getStartTime() == null || booking.getEndTime() == null) {
+            throw new RuntimeException("Booking time not set properly");
+        }
+
+        long hours = Duration.between(
+                booking.getStartTime(),
+                booking.getEndTime()
+        ).toHours();
+
+        return Math.max(hours, 1) * 50;
+    }
+
+    // 🔥 RETRY PAYMENT
+    public Booking retryPayment(Long id) {
+
+        Booking booking = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (booking.getStatus() != Booking.BookingStatus.FAILED) {
+            throw new RuntimeException("Payment retry allowed only for FAILED bookings");
+        }
+
+        Payment payment = new Payment();
+        payment.setBookingId(booking.getId());
+        payment.setUserId(booking.getUserId()); // ✅ IMPORTANT
+        payment.setAmount(calculateAmount(booking));
+
+        Payment response = paymentClient.makePayment(payment);
+
+        if (response == null || !response.isSuccess()) {
+            throw new RuntimeException("Payment retry failed");
+        }
+
+        booking.setStatus(Booking.BookingStatus.RESERVED);
+
+        spotClient.occupySpot(booking.getSpotId());
+
+        return repo.save(booking);
+    }
+
+    public AnalyticsResponse getAnalytics() {
+
+        List<Booking> bookings = repo.findAll();
+
+        long totalBookings = bookings.size();
+
+        long activeBookings = bookings.stream()
+                .filter(b -> b.getStatus() == Booking.BookingStatus.ACTIVE)
+                .count();
+
+        double totalRevenue = bookings.stream()
+                .filter(b -> b.getStatus() == Booking.BookingStatus.COMPLETED)
+                .mapToDouble(this::calculateAmount)
+                .sum();
+
+        return new AnalyticsResponse(
+                totalBookings,
+                activeBookings,
+                totalRevenue
+        );
+    }
+
+    public BookingDetailsResponse getBookingDetails(Long id) {
+
+        // 1. booking
+        Booking booking = repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        // 2. spot
+        Object spot = spotClient.getSpot(booking.getSpotId());
+
+        // 3. vehicle
+        Object vehicle = vehicleClient.getVehicle(booking.getVehicleId());
+
+        // 4. payment
+
+        PaymentResponse payment = paymentClient.getPaymentByBooking(id);
+
+        return new BookingDetailsResponse(
+                booking,
+                spot,
+                vehicle,
+                payment
+        );
+    }
+
+    public List<RecentBookingDTO> getRecentBookings(Long userId) {
+
+        return repo.findTop5ByUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(b -> new RecentBookingDTO(
+                        b.getId(),
+                        b.getStatus().name(),
+                        b.getSpotId(),
+                        b.getStartTime()
+                ))
+                .toList();
     }
 }

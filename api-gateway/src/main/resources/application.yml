@@ -41,6 +41,11 @@ spring:
           predicates:
             - Path=/auth/**
 
+        - id: vehicle-service
+          uri: lb://VEHICLE-SERVICE
+          predicates:
+            - Path=/vehicles/**
+
 
       globalcors:
         corsConfigurations:
