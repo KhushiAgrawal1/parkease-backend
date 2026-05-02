@@ -10,12 +10,14 @@ import com.parkease.bookingservice.repository.BookingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.parkease.bookingservice.dto.PaymentResponse;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
@@ -284,16 +286,18 @@ public class BookingService {
         );
     }
 
+    // @Cacheable(value = "recentBookings", key = "#userId")
+
     public List<RecentBookingDTO> getRecentBookings(Long userId) {
 
         return repo.findTop5ByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(b -> new RecentBookingDTO(
                         b.getId(),
-                        b.getStatus().name(),
+                        b.getStatus() != null ? b.getStatus().name() : "UNKNOWN",
                         b.getSpotId(),
                         b.getStartTime()
                 ))
-                .toList();
+                .collect(Collectors.toList());
     }
 }
