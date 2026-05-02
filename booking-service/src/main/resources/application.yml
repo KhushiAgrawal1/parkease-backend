@@ -3,17 +3,12 @@ server:
 
 spring:
   application:
-    name: booking-service
+    name: BOOKING-SERVICE
 
   datasource:
     url: jdbc:mysql://localhost:3306/parkease_booking
     username: root
     password: 8770B26@k
-
-  data:
-    redis:
-      host: localhost
-      port: 6379
 
   jpa:
     hibernate:
@@ -33,5 +28,12 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
 
   instance:
-    hostname: localhost
+    instance-id: ${spring.application.name}:${server.port}
     prefer-ip-address: true
+    ip-address: 127.0.0.1
+    hostname: localhost
+
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 127.0.0.1
