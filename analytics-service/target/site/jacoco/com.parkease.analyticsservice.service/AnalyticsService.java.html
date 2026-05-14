@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">analytics-service</a> &gt; <a href="index.source.html" class="el_package">com.parkease.analyticsservice.service</a> &gt; <span class="el_source">AnalyticsService.java</span></div><h1>AnalyticsService.java</h1><pre class="source lang-java linenums">package com.parkease.analyticsservice.service;
+
+import com.parkease.analyticsservice.client.BookingClient;
+import com.parkease.analyticsservice.client.LotClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+<span class="fc" id="L13">public class AnalyticsService {</span>
+
+    @Autowired
+    private BookingClient bookingClient;
+
+    @Autowired
+    private LotClient lotClient;
+
+    public Map&lt;String, Object&gt; getPlatformAnalytics() {
+<span class="fc" id="L22">        Map&lt;String, Object&gt; analytics = new HashMap&lt;&gt;();</span>
+        
+        try {
+<span class="fc" id="L25">            Map&lt;String, Object&gt; bookingData = bookingClient.getAnalytics();</span>
+<span class="fc" id="L26">            analytics.putAll(bookingData);</span>
+<span class="fc" id="L27">        } catch (Exception e) {</span>
+<span class="fc" id="L28">            analytics.put(&quot;totalBookings&quot;, 0);</span>
+<span class="fc" id="L29">            analytics.put(&quot;activeBookings&quot;, 0);</span>
+<span class="fc" id="L30">            analytics.put(&quot;totalRevenue&quot;, 0);</span>
+<span class="fc" id="L31">        }</span>
+
+        try {
+<span class="fc" id="L34">            List&lt;Object&gt; lots = lotClient.getAllLots();</span>
+<span class="fc" id="L35">            analytics.put(&quot;totalLots&quot;, lots.size());</span>
+<span class="fc" id="L36">        } catch (Exception e) {</span>
+<span class="fc" id="L37">            analytics.put(&quot;totalLots&quot;, 0);</span>
+<span class="fc" id="L38">        }</span>
+
+<span class="fc" id="L40">        return analytics;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

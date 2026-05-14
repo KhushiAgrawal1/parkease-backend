@@ -1,0 +1,5 @@
+com\parkease\analyticsservice\controller\AnalyticsController.class
+com\parkease\analyticsservice\service\AnalyticsService.class
+com\parkease\analyticsservice\client\LotClient.class
+com\parkease\analyticsservice\AnalyticsServiceApplication.class
+com\parkease\analyticsservice\client\BookingClient.class

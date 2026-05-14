@@ -1,0 +1,35 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: analytics-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/parkease_analytics?createDatabaseIfNotExist=true
+    username: root
+    password: 8770B26@k
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+  instance:
+    instance-id: ${spring.application.name}:${server.port}
+    prefer-ip-address: true
+    ip-address: 127.0.0.1
+    hostname: localhost
+
+  cloud:
+    inetutils:
+      preferred-networks:
+        - 127.0.0.1
+
